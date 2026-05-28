@@ -1,0 +1,123 @@
+import { scanCode } from './scanner.js';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+
+const s3 = new S3Client({});
+const docClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+
+const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME;
+const DYNAMODB_TABLE_NAME = process.env.DYNAMODB_TABLE_NAME;
+
+export const handler = async (event) => {
+  console.log('Received event:', JSON.stringify(event, null, 2));
+
+  try {
+    let body = {};
+    if (event.body) {
+      body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+    } else {
+      body = event;
+    }
+
+    const { code, filename = 'untitled.js' } = body;
+
+    if (!code) {
+      return {
+        statusCode: 400,
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Access-Control-Allow-Origin': '*' 
+        },
+        body: JSON.stringify({ error: 'No code provided' })
+      };
+    }
+
+    // Run the scan
+    console.log(`Scanning file: ${filename}`);
+    const results = scanCode(code, filename);
+    const scanId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+    const scannedAt = new Date().toISOString();
+
+    const summary = {
+      totalVulnerabilities: results.length,
+      high: results.filter(v => v.severity === 'HIGH').length,
+      medium: results.filter(v => v.severity === 'MEDIUM').length,
+      low: results.filter(v => v.severity === 'LOW').length
+    };
+
+    const report = {
+      success: true,
+      scanId,
+      filename,
+      scannedAt,
+      summary,
+      vulnerabilities: results
+    };
+
+    // 1. Upload full report to S3
+    let s3Key = null;
+    if (S3_BUCKET_NAME) {
+      s3Key = `reports/${scanId}.json`;
+      await s3.send(new PutObjectCommand({
+        Bucket: S3_BUCKET_NAME,
+        Key: s3Key,
+        Body: JSON.stringify(report),
+        ContentType: 'application/json'
+      }));
+      console.log(`Saved report to S3: s3://${S3_BUCKET_NAME}/${s3Key}`);
+    } else {
+      console.warn('S3_BUCKET_NAME env variable not set. Skipping S3 upload.');
+    }
+
+    // 2. Save metadata to DynamoDB
+    if (DYNAMODB_TABLE_NAME) {
+      const ttl = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // 30 days retention
+      await docClient.send(new PutCommand({
+        TableName: DYNAMODB_TABLE_NAME,
+        Item: {
+          scanId,
+          scannedAt,
+          filename,
+          highCount: summary.high,
+          mediumCount: summary.medium,
+          lowCount: summary.low,
+          totalCount: summary.totalVulnerabilities,
+          s3Key,
+          ttl
+        }
+      }));
+      console.log(`Saved metadata to DynamoDB table ${DYNAMODB_TABLE_NAME}`);
+    } else {
+      console.warn('DYNAMODB_TABLE_NAME env variable not set. Skipping DynamoDB save.');
+    }
+
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'OPTIONS,POST'
+      },
+      body: JSON.stringify({
+        success: true,
+        scanId,
+        scannedAt,
+        summary,
+        s3Key
+      })
+    };
+
+  } catch (error) {
+    console.error('Error during scan execution:', error);
+    return {
+      statusCode: 500,
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Access-Control-Allow-Origin': '*' 
+      },
+      body: JSON.stringify({ error: 'Scan failed', message: error.message })
+    };
+  }
+};

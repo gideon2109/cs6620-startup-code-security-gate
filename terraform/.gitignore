@@ -1,0 +1,29 @@
+# Terraform generated files
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.*.backup
+.terraform.lock.hcl
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Terraform variable override files (may contain secrets)
+*.tfvars
+*.tfvars.json
+!example.tfvars
+
+# Terraform plan files
+*.tfplan
+
+# IDE/editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db

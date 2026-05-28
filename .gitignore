@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+terraform.tfvars.json
+
+# Local files
+.DS_Store
+*.log
+
+# AWS credentials
+aws_credentials.txt
+
+# Local environment
+.env
+.venv/
