@@ -121,3 +121,8 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Enhanced error handling for production
+// - Retry logic for DynamoDB throttling
+// - Exponential backoff for S3 uploads
+// - Dead-letter queue integration (planned)
