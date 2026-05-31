@@ -4,6 +4,8 @@
 
 A serverless SAST (Static Application Security Testing) scanner for JavaScript/Node.js applications. Startup teams can paste code and receive vulnerability reports before deployment.
 
+---
+
 ## Team & Work Division
 
 | Role | Owner | Components |
@@ -11,12 +13,13 @@ A serverless SAST (Static Application Security Testing) scanner for JavaScript/N
 | **Infrastructure + Backend** | Gideon | DynamoDB, Terraform modules, Lambda (S3/DynamoDB integration), API Gateway |
 | **Frontend + UI** | Rahul | S3 static website, upload form, API integration, result display |
 
-## Architecture Overview
-User submits code → API Gateway → Lambda (SAST scanner) → S3 (full report) + DynamoDB (metadata) → User views results
-↓
-CloudWatch (logs + alarms)
+---
 
-text
+## Architecture Overview
+
+![Cloud SAST Pipeline](../docs/architecture.png)
+
+---
 
 ## AWS Services Used
 
@@ -29,19 +32,24 @@ text
 | S3 | Stores full JSON vulnerability reports (30-day lifecycle) |
 | CloudWatch | Logging, metrics, and alarms |
 
+---
+
 ## Infrastructure as Code
 
 All resources are defined in **Terraform modules**:
-terraform/modules/
-├── ecr/ # Container registry
-├── s3/ # Report storage + lifecycle rules
-├── dynamodb/ # Metadata table with TTL (Gideon ownership)
-├── lambda/ # SAST scanner function
-└── api_gateway/ # HTTP endpoint
 
-text
+```
+terraform/modules/
+├── ecr/          # Container registry
+├── s3/           # Report storage + lifecycle rules
+├── dynamodb/     # Metadata table
+├── lambda/       # SAST scanner function
+└── api_gateway/  # HTTP endpoint
+```
 
 Every resource is tagged with `Group-9` for easy identification.
+
+---
 
 ## Deployment
 
@@ -63,15 +71,24 @@ cd cs6620-startup-code-security-gate
 
 # Test the deployment
 ./test-scan.sh
-Outputs
+```
+
+### Outputs
+
 After deployment, Terraform outputs:
 
-bash
+```bash
 terraform output
-# ecr_repository_url = ...
-# api_gateway_url = https://xxxx.execute-api.us-east-1.amazonaws.com/scan
-# s3_bucket_name = sast-reports-xxxxxx
-# dynamodb_table_name = sast-scan-metadata
-Cleanup
-bash
+# ecr_repository_url    = ...
+# api_gateway_url       = https://xxxx.execute-api.us-east-1.amazonaws.com/scan
+# s3_bucket_name        = sast-reports-xxxxxx
+# dynamodb_table_name   = sast-scan-metadata
+```
+
+---
+
+## Cleanup
+
+```bash
 terraform destroy
+```
