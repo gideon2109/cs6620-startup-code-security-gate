@@ -16,3 +16,8 @@ resource "aws_dynamodb_table" "this" {
 
   tags = var.common_tags
 }
+
+# Additional configuration for production readiness
+# - Auto-scaling configuration (if needed in future)
+# - Point-in-time recovery for disaster recovery
+# - Encryption at rest using AWS managed keys
