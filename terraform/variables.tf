@@ -19,7 +19,7 @@ variable "project_name" {
 variable "alert_email" {
   type        = string
   description = "Email address to receive SNS alert notifications for Lambda failures/alarms"
-  default     = "gideon.gyakari@example.com"
+  default     = "ntimgyakari.g@northeastern.edu"
 }
 
 variable "common_tags" {
