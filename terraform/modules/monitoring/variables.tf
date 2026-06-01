@@ -11,7 +11,7 @@ variable "lambda_function_name" {
 variable "alert_email" {
   type        = string
   description = "Email address to receive SNS alert notifications"
-  default     = "gideon.gyakari@example.com"
+  default     = "ntimgyakari.g@northeastern.edu"
 }
 
 variable "common_tags" {
