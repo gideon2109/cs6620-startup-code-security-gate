@@ -10,7 +10,7 @@ A serverless SAST (Static Application Security Testing) scanner for JavaScript/N
 
 | Role | Owner | Components |
 |------|-------|------------|
-| **Infrastructure + Backend** | Gideon | DynamoDB, Terraform modules, Lambda (S3/DynamoDB integration), API Gateway |
+| **Infrastructure + Backend** | Gideon | DynamoDB, S3, ECR, Lambda (S3/DynamoDB integration, Function URL), CloudWatch & SNS |
 | **Frontend + UI** | Rahul | S3 static website, upload form, API integration, result display |
 
 ---
@@ -27,10 +27,10 @@ A serverless SAST (Static Application Security Testing) scanner for JavaScript/N
 |---------|---------|
 | ECR | Docker container registry for SAST scanner |
 | Lambda | Runs the containerized SAST scanner |
-| API Gateway | Public HTTPS endpoint for scan requests |
+| Lambda Function URL | Public HTTPS endpoint for scan requests |
 | DynamoDB | Stores scan metadata (scanId, timestamp, severity counts) with 30-day TTL |
 | S3 | Stores full JSON vulnerability reports (30-day lifecycle) |
-| CloudWatch | Logging, metrics, and alarms |
+| CloudWatch & SNS | Logging, metrics, failure alarms, and email alerts |
 
 ---
 
@@ -43,8 +43,8 @@ terraform/modules/
 ├── ecr/          # Container registry
 ├── s3/           # Report storage + lifecycle rules
 ├── dynamodb/     # Metadata table
-├── lambda/       # SAST scanner function
-└── api_gateway/  # HTTP endpoint
+├── lambda/       # SAST scanner function + Function URL
+└── monitoring/   # CloudWatch alarms + SNS topic
 ```
 
 Every resource is tagged with `Group-9` for easy identification.
@@ -80,7 +80,7 @@ After deployment, Terraform outputs:
 ```bash
 terraform output
 # ecr_repository_url    = ...
-# api_gateway_url       = https://xxxx.execute-api.us-east-1.amazonaws.com/scan
+# lambda_function_url   = https://xxxx.lambda-url.us-east-1.on.aws/
 # s3_bucket_name        = sast-reports-xxxxxx
 # dynamodb_table_name   = sast-scan-metadata
 ```
