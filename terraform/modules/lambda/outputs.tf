@@ -8,7 +8,7 @@ output "function_arn" {
   value       = aws_lambda_function.this.arn
 }
 
-output "invoke_arn" {
-  description = "The invoke ARN of the Lambda function (used by API Gateway)"
-  value       = aws_lambda_function.this.invoke_arn
+output "function_url" {
+  description = "The public endpoint URL of the Lambda function"
+  value       = aws_lambda_function_url.this.function_url
 }
