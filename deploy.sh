@@ -53,7 +53,7 @@ echo "==> Step 6: Pushing Docker image to ECR..."
 docker push "$ECR_URL:latest"
 
 # ==============================================================================
-# Step 7: Deploy all remaining resources (S3, DynamoDB, Lambda, API Gateway)
+# Step 7: Deploy all remaining resources (S3, DynamoDB, Lambda, Monitoring)
 # ==============================================================================
 echo "==> Step 7: Deploying complete serverless stack..."
 cd "$TERRAFORM_DIR"
