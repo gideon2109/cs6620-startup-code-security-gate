@@ -16,6 +16,12 @@ variable "project_name" {
   default     = "startup-code-security-gate"
 }
 
+variable "alert_email" {
+  type        = string
+  description = "Email address to receive SNS alert notifications for Lambda failures/alarms"
+  default     = "gideon.gyakari@example.com"
+}
+
 variable "common_tags" {
   type        = map(string)
   description = "Common tags applied to all resources for tracking"

@@ -51,12 +51,13 @@ module "lambda" {
 }
 
 # ==============================================================================
-# Module 5: API Gateway - Public HTTP endpoint for triggering scans
+# Module 5: Monitoring - CloudWatch Alarms + SNS Notifications for Failures
 # ==============================================================================
-module "api_gateway" {
-  source               = "./modules/api_gateway"
-  lambda_invoke_arn    = module.lambda.invoke_arn
+module "monitoring" {
+  source               = "./modules/monitoring"
+  project_name         = var.project_name
   lambda_function_name = module.lambda.function_name
+  alert_email          = var.alert_email
   common_tags          = var.common_tags
 
   depends_on = [module.lambda]
