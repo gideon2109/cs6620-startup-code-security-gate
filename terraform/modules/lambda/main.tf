@@ -16,3 +16,26 @@ resource "aws_lambda_function" "this" {
 
   tags = var.common_tags
 }
+
+# Lambda Function URL (Public HTTPS endpoint for scans, replacing API Gateway)
+resource "aws_lambda_function_url" "this" {
+  function_name      = aws_lambda_function.this.function_name
+  authorization_type = "NONE"
+
+  cors {
+    allow_credentials = false
+    allow_origins     = ["*"]
+    allow_methods     = ["POST", "OPTIONS"]
+    allow_headers     = ["content-type"]
+    max_age           = 86400
+  }
+}
+
+# AWS Lambda Permission to allow public unauthenticated invokes on the Function URL
+resource "aws_lambda_permission" "func_url" {
+  statement_id           = "AllowFunctionURLInvoke"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.this.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
