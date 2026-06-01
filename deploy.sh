@@ -44,7 +44,7 @@ aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS 
 # ==============================================================================
 echo "==> Step 5: Building Docker image..."
 cd "$DIR"
-docker build -t "$ECR_URL:latest" .
+docker build --provenance=false --platform linux/amd64 -t "$ECR_URL:latest" .
 
 # ==============================================================================
 # Step 6: Push the Docker image to ECR
