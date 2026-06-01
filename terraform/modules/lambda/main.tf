@@ -1,4 +1,4 @@
-# Lambda Function running the SAST scanner from an ECR Docker image
+# Lambda Function
 resource "aws_lambda_function" "this" {
   function_name = "sast-scanner-lambda"
   role          = "arn:aws:iam::${var.aws_account_id}:role/LabRole"
@@ -17,7 +17,7 @@ resource "aws_lambda_function" "this" {
   tags = var.common_tags
 }
 
-# Lambda Function URL (Public HTTPS endpoint for scans, replacing API Gateway)
+# Lambda Function URL (Public HTTPS endpoint for scans)
 resource "aws_lambda_function_url" "this" {
   function_name      = aws_lambda_function.this.function_name
   authorization_type = "NONE"
@@ -31,7 +31,7 @@ resource "aws_lambda_function_url" "this" {
   }
 }
 
-# AWS Lambda Permission to allow public unauthenticated invokes on the Function URL
+# Permission 1: Allow public invocation of the Function URL
 resource "aws_lambda_permission" "func_url" {
   statement_id           = "AllowFunctionURLInvoke"
   action                 = "lambda:InvokeFunctionUrl"
@@ -39,3 +39,4 @@ resource "aws_lambda_permission" "func_url" {
   principal              = "*"
   function_url_auth_type = "NONE"
 }
+
