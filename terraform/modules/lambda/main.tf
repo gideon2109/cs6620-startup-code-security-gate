@@ -23,11 +23,11 @@ resource "aws_lambda_function_url" "this" {
   authorization_type = "NONE"
 
   cors {
+    allow_origins = ["*"]
+    allow_methods = ["POST"]
+    allow_headers = ["content-type", "application/json"]
     allow_credentials = false
-    allow_origins     = ["*"]
-    allow_methods     = ["*"]
-    allow_headers     = ["content-type"]
-    max_age           = 86400
+    max_age = 86400
   }
 }
 
