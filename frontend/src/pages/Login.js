@@ -63,7 +63,7 @@ function Login({ setUser }) {
 
         <form onSubmit={handleLogin} style={styles.form}>
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Northeastern / Academic Email</label>
+            <label style={styles.label}>Email</label>
             <div style={styles.inputContainer}>
               <Mail size={18} style={styles.inputIcon} />
               <input
