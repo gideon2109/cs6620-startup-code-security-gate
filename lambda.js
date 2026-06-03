@@ -25,18 +25,12 @@ export const handler = async (event) => {
     if (!code) {
       return {
         statusCode: 400,
-        headers: { 
-          'Content-Type': 'application/json', 
-          'Access-Control-Allow-Origin': '*' 
-        },
         body: JSON.stringify({ error: 'No code provided' })
       };
     }
 
-    // Run the scan
-    console.log(`Scanning file: ${filename}`);
     const results = scanCode(code, filename);
-    const scanId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+    const scanId = crypto.randomUUID();
     const scannedAt = new Date().toISOString();
 
     const summary = {
@@ -55,7 +49,6 @@ export const handler = async (event) => {
       vulnerabilities: results
     };
 
-    // 1. Upload full report to S3
     let s3Key = null;
     if (S3_BUCKET_NAME) {
       s3Key = `reports/${scanId}.json`;
@@ -65,14 +58,10 @@ export const handler = async (event) => {
         Body: JSON.stringify(report),
         ContentType: 'application/json'
       }));
-      console.log(`Saved report to S3: s3://${S3_BUCKET_NAME}/${s3Key}`);
-    } else {
-      console.warn('S3_BUCKET_NAME env variable not set. Skipping S3 upload.');
     }
 
-    // 2. Save metadata to DynamoDB
     if (DYNAMODB_TABLE_NAME) {
-      const ttl = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // 30 days retention
+      const ttl = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
       await docClient.send(new PutCommand({
         TableName: DYNAMODB_TABLE_NAME,
         Item: {
@@ -87,19 +76,10 @@ export const handler = async (event) => {
           ttl
         }
       }));
-      console.log(`Saved metadata to DynamoDB table ${DYNAMODB_TABLE_NAME}`);
-    } else {
-      console.warn('DYNAMODB_TABLE_NAME env variable not set. Skipping DynamoDB save.');
     }
 
     return {
       statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'OPTIONS,POST'
-      },
       body: JSON.stringify({
         success: true,
         scanId,
@@ -110,19 +90,10 @@ export const handler = async (event) => {
     };
 
   } catch (error) {
-    console.error('Error during scan execution:', error);
+    console.error('Error:', error);
     return {
       statusCode: 500,
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Access-Control-Allow-Origin': '*' 
-      },
       body: JSON.stringify({ error: 'Scan failed', message: error.message })
     };
   }
 };
-
-// Enhanced error handling for production
-// - Retry logic for DynamoDB throttling
-// - Exponential backoff for S3 uploads
-// - Dead-letter queue integration (planned)
