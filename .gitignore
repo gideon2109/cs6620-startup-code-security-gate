@@ -19,3 +19,4 @@ aws_credentials.txt
 # Local environment
 .env
 .venv/
+frontend/build/
