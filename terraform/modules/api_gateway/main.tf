@@ -3,6 +3,13 @@ resource "aws_apigatewayv2_api" "this" {
   name          = "sast-scanner-api"
   protocol_type = "HTTP"
 
+  cors_configuration {
+    allow_origins = ["http://gideon-sast-frontend.s3-website-us-east-1.amazonaws.com"]
+    allow_methods = ["POST"]
+    allow_headers = ["content-type"]
+    max_age = 300
+  }
+
   tags = var.common_tags
 }
 
