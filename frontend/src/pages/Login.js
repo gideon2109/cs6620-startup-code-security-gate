@@ -68,7 +68,7 @@ function Login({ setUser }) {
               <Mail size={18} style={styles.inputIcon} />
               <input
                 type="email"
-                placeholder="your.email@northeastern.edu"
+                placeholder="email@northeastern.edu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={styles.input}
@@ -78,7 +78,7 @@ function Login({ setUser }) {
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Access Token / Password</label>
+            <label style={styles.label}>Password</label>
             <div style={styles.inputContainer}>
               <Lock size={18} style={styles.inputIcon} />
               <input
