@@ -18,7 +18,7 @@ function Dashboard({ user, setUser }) {
   const [activeTab, setActiveTab] = useState('summary'); // summary | details | payload
 
   // YOUR LAMBDA FUNCTION URL (fully configured and validated)
-  const LAMBDA_URL = "https://qgjmkjjd5gigot73bi4i3jigai0nyrjj.lambda-url.us-east-1.on.aws/";
+  const LAMBDA_URL = process.env.REACT_APP_API_URL;
 
   // Load scan history from localStorage on mount
   useEffect(() => {

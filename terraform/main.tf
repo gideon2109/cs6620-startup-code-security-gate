@@ -62,3 +62,11 @@ module "monitoring" {
 
   depends_on = [module.lambda]
 }
+
+# API Gateway module (proven working, replaces Lambda URL)
+module "api_gateway" {
+  source               = "./modules/api_gateway"
+  lambda_invoke_arn    = module.lambda.aws_lambda_function.this.invoke_arn
+  lambda_function_name = module.lambda.aws_lambda_function.this.function_name
+  common_tags          = local.common_tags
+}
