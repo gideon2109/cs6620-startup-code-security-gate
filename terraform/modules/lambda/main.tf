@@ -17,7 +17,7 @@ resource "aws_lambda_function" "this" {
   tags = var.common_tags
 }
 
-# Lambda Function URL (Public HTTPS endpoint for scans)
+# Lambda Function URL (depends on Lambda function)
 resource "aws_lambda_function_url" "this" {
   function_name      = aws_lambda_function.this.function_name
   authorization_type = "NONE"
@@ -29,6 +29,9 @@ resource "aws_lambda_function_url" "this" {
     allow_credentials = false
     max_age = 86400
   }
+
+  # PERMANENT FIX: Wait for Lambda function to be fully created
+  depends_on = [aws_lambda_function.this]
 }
 
 # Permission 1: Allow public invocation of the Function URL
@@ -38,5 +41,6 @@ resource "aws_lambda_permission" "func_url" {
   function_name          = aws_lambda_function.this.function_name
   principal              = "*"
   function_url_auth_type = "NONE"
-}
 
+  depends_on = [aws_lambda_function_url.this]
+}
