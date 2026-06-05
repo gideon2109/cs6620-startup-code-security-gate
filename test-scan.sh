@@ -4,20 +4,20 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TERRAFORM_DIR="$DIR/terraform"
 
-# Get Lambda Function URL from Terraform
+# Get API Gateway URL from Terraform (not Lambda URL)
 cd "$TERRAFORM_DIR"
-API_URL=$(terraform output -raw lambda_function_url 2>/dev/null || echo "")
+API_URL=$(terraform output -raw api_gateway_url 2>/dev/null || echo "")
 
 if [ -z "$API_URL" ] || [[ "$API_URL" == *"No outputs"* ]]; then
-  echo "Error: Could not retrieve lambda_function_url. Please run deploy.sh first."
+  echo "Error: Could not retrieve api_gateway_url. Please run deploy.sh first."
   exit 1
 fi
 
 echo "==> Target Endpoint: $API_URL"
-echo "==> Sending test payload with three vulnerabilities:"
+echo "==> Sending test payload with vulnerabilities:"
 echo "    1. Hardcoded Stripe secret key"
-: "    2. SQL injection query concatenation"
-: "    3. Insecure eval() function usage"
+echo "    2. SQL injection query concatenation"
+echo "    3. Insecure eval() function usage"
 echo "--------------------------------------------------------"
 
 PAYLOAD='{
@@ -30,6 +30,6 @@ RESPONSE=$(curl -s -X POST "$API_URL" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD")
 
-echo "==> Response from AWS Lambda Function URL:"
+echo "==> Response from API Gateway:"
 echo "$RESPONSE" | python -m json.tool 2>/dev/null || echo "$RESPONSE"
 echo "--------------------------------------------------------"

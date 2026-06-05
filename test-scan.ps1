@@ -1,5 +1,5 @@
 # test-scan.ps1
-# PowerShell verification script for the SAST Scanner Lambda Function URL
+# PowerShell verification script for the SAST Scanner API Gateway
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $TerraformDir = Join-Path $ScriptDir "terraform"
@@ -8,8 +8,8 @@ $TerraformDir = Join-Path $ScriptDir "terraform"
 Push-Location $TerraformDir
 
 try {
-    # Run terraform output
-    $ApiUrl = terraform output -raw lambda_function_url 2>$null
+    # Run terraform output - use api_gateway_url instead of lambda_function_url
+    $ApiUrl = terraform output -raw api_gateway_url 2>$null
 }
 catch {
     $ApiUrl = $null
@@ -19,7 +19,7 @@ finally {
 }
 
 if ([string]::IsNullOrEmpty($ApiUrl) -or $ApiUrl -like "*No outputs*") {
-    Write-Error "Error: Could not retrieve lambda_function_url. Please run deploy.sh or run 'terraform apply' inside the terraform/ directory first."
+    Write-Error "Error: Could not retrieve api_gateway_url. Please run deploy.sh or run 'terraform apply' inside the terraform/ directory first."
     exit 1
 }
 
@@ -39,7 +39,7 @@ $Payload = @{
 # Send POST request
 try {
     $Response = Invoke-RestMethod -Uri $ApiUrl -Method Post -Body $Payload -ContentType "application/json"
-    Write-Host "==> Response from AWS Lambda Function URL:"
+    Write-Host "==> Response from API Gateway:"
     $Response | ConvertTo-Json -Depth 5
 }
 catch {
