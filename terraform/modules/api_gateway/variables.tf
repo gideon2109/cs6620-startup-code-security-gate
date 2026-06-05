@@ -1,15 +1,12 @@
 variable "lambda_invoke_arn" {
-  type        = string
-  description = "The invoke ARN of the Lambda function to integrate with"
+  type = string
 }
 
 variable "lambda_function_name" {
-  type        = string
-  description = "The name of the Lambda function for permission grants"
+  type = string
 }
 
 variable "common_tags" {
-  type        = map(string)
-  description = "Common tags applied to all resources"
-  default     = {}
+  type    = map(string)
+  default = {}
 }

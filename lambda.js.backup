@@ -9,12 +9,23 @@ const docClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME;
 const DYNAMODB_TABLE_NAME = process.env.DYNAMODB_TABLE_NAME;
 
-// Only content-type header – API Gateway handles CORS
-const standardHeaders = {
-  'Content-Type': 'application/json'
+// CORS headers for all responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, application/json',
 };
 
 export const handler = async (event) => {
+  // Handle OPTIONS preflight
+  if (event.httpMethod === 'OPTIONS' || event.requestContext?.http?.method === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: ''
+    };
+  }
+
   console.log('Received event:', JSON.stringify(event, null, 2));
 
   try {
@@ -30,7 +41,7 @@ export const handler = async (event) => {
     if (!code) {
       return {
         statusCode: 400,
-        headers: standardHeaders,
+        headers: corsHeaders,
         body: JSON.stringify({ error: 'No code provided' })
       };
     }
@@ -86,7 +97,7 @@ export const handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: standardHeaders,
+      headers: corsHeaders,
       body: JSON.stringify({
         success: true,
         scanId,
@@ -100,7 +111,7 @@ export const handler = async (event) => {
     console.error('Error:', error);
     return {
       statusCode: 500,
-      headers: standardHeaders,
+      headers: corsHeaders,
       body: JSON.stringify({ error: 'Scan failed', message: error.message })
     };
   }
