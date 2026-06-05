@@ -66,4 +66,38 @@ echo "=========================================================="
 echo ""
 terraform output
 echo ""
+
+# ==============================================================================
+# Step 8: Update Frontend with latest API Gateway URL
+# ==============================================================================
+echo "==> Step 8: Updating frontend with latest API Gateway URL..."
+
+# Get API Gateway URL
+API_URL=$(terraform output -raw api_gateway_url)
+echo "==> API Gateway URL: $API_URL"
+
+# Update frontend .env
+cd "$DIR/frontend"
+echo "REACT_APP_API_URL=$API_URL" > .env
+echo "==> .env file updated"
+
+# Install dependencies if needed
+if [ ! -d "node_modules" ]; then
+    echo "==> Installing frontend dependencies..."
+    npm install
+fi
+
+# Rebuild frontend
+echo "==> Building frontend..."
+npm run build
+
+# Deploy to S3
+echo "==> Deploying frontend to S3..."
+aws s3 sync build/ s3://gideon-sast-frontend/ --region us-east-1 --delete
+
+echo ""
+echo "=========================================================="
+echo "       FRONTEND UPDATED SUCCESSFULLY                     "
+echo "=========================================================="
+echo "🌐 Frontend URL: http://gideon-sast-frontend.s3-website-us-east-1.amazonaws.com"
 echo "=========================================================="

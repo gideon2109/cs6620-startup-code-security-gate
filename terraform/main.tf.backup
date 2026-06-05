@@ -1,9 +1,0 @@
-# ... (keep your existing resources before module "api_gateway")
-
-# API Gateway module (simplified, no CORS Lambda)
-module "api_gateway" {
-  source               = "./modules/api_gateway"
-  lambda_invoke_arn    = module.lambda.invoke_arn
-  lambda_function_name = module.lambda.function_name
-  common_tags          = var.common_tags
-}
