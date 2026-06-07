@@ -30,7 +30,7 @@ resource "aws_lambda_function_url" "this" {
     max_age = 86400
   }
 
-  # PERMANENT FIX: Wait for Lambda function to be fully created
+  # This is fixed:Wait for Lambda function to be fully created
   depends_on = [aws_lambda_function.this]
 }
 
