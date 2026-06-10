@@ -38,3 +38,8 @@ variable "sns_topic_arn" {
   type        = string
   description = "SNS topic ARN for publishing critical vulnerability alerts"
 }
+
+variable "sqs_queue_arn" {
+  type        = string
+  description = "ARN of the SQS queue for Lambda trigger"
+}

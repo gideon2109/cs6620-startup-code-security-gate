@@ -118,3 +118,30 @@ echo "       FRONTEND UPDATED SUCCESSFULLY                     "
 echo "=========================================================="
 echo "🌐 Frontend URL: http://gideon-sast-frontend.s3-website-us-east-1.amazonaws.com"
 echo "=========================================================="
+
+# ==============================================================================
+# Step 8: Auto-update frontend
+# ==============================================================================
+echo ""
+echo "==> Step 8: Updating frontend automatically..."
+
+cd "$DIR/terraform"
+LAMBDA_URL=$(terraform output -raw lambda_function_url)
+echo "==> Lambda URL: $LAMBDA_URL"
+
+cd "$DIR/frontend"
+echo "REACT_APP_API_URL=$LAMBDA_URL" > .env
+echo "==> .env file updated"
+
+npm run build
+echo "==> Frontend built"
+
+# Create bucket if needed
+aws s3 mb s3://group9-sast-frontend --region us-east-1 2>/dev/null || true
+aws s3 website s3://group9-sast-frontend --index-document index.html --error-document index.html
+
+# Deploy frontend
+aws s3 sync build/ s3://group9-sast-frontend/ --region us-east-1 --delete
+
+echo "==> Frontend deployed"
+echo "🌐 Frontend URL: http://group9-sast-frontend.s3-website-us-east-1.amazonaws.com"

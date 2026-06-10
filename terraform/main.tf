@@ -3,6 +3,10 @@
 # ==============================================================================
 data "aws_caller_identity" "current" {}
 
+data "aws_iam_role" "lab_role" {
+  name = "LabRole"
+}
+
 # Random suffix for globally unique S3 bucket name
 resource "random_string" "suffix" {
   length  = 6
@@ -22,16 +26,6 @@ locals {
     Course      = "CS6620-CloudComputing"
     Group       = "Group-9"
   }
-}
-
-# ==============================================================================
-# Module 0: VPC – Network Isolation (Milestone 2)
-# Private subnet for Lambda + NAT Gateway for secure outbound access
-# ==============================================================================
-module "vpc" {
-  source      = "./modules/vpc"
-  aws_region  = var.aws_region
-  common_tags = local.common_tags
 }
 
 # ==============================================================================
@@ -61,20 +55,24 @@ module "dynamodb" {
 }
 
 # ==============================================================================
-# Module 6: Monitoring (CloudWatch + SNS)
-# Declared before Lambda so we can pass sns_topic_arn into Lambda env vars
+# Module 4: VPC
 # ==============================================================================
-module "monitoring" {
-  source               = "./modules/monitoring"
-  project_name         = var.project_name
-  lambda_function_name = "sast-scanner-lambda"
-  alert_email          = var.alert_email
-  common_tags          = local.common_tags
+module "vpc" {
+  source      = "./modules/vpc"
+  common_tags = local.common_tags
 }
 
 # ==============================================================================
-# Module 4: Lambda
-# Runs inside private VPC subnet; SNS ARN injected for vulnerability alerts
+# Module 5: SQS
+# ==============================================================================
+module "sqs" {
+  source        = "./modules/sqs"
+  common_tags   = local.common_tags
+  sns_topic_arn = module.monitoring.sns_topic_arn
+}
+
+# ==============================================================================
+# Module 6: Lambda
 # ==============================================================================
 module "lambda" {
   source              = "./modules/lambda"
@@ -82,26 +80,40 @@ module "lambda" {
   ecr_repository_url  = module.ecr.repository_url
   s3_bucket_name      = module.s3.bucket_name
   dynamodb_table_name = module.dynamodb.table_name
+  sns_topic_arn       = module.monitoring.sns_topic_arn
+  sqs_queue_arn       = module.sqs.scan_queue_arn
   private_subnet_id   = module.vpc.private_subnet_id
   security_group_id   = module.vpc.security_group_id
-  sns_topic_arn       = module.monitoring.sns_topic_arn
   common_tags         = local.common_tags
 
-  depends_on = [module.ecr, module.vpc]
+  depends_on = [module.ecr]
 }
 
 # ==============================================================================
-# Module 5: API Gateway
+# Module 7: API Gateway
 # ==============================================================================
 module "api_gateway" {
   source               = "./modules/api_gateway"
   lambda_invoke_arn    = module.lambda.invoke_arn
   lambda_function_name = module.lambda.function_name
+  sqs_queue_url        = module.sqs.scan_queue_url
+  iam_role_arn         = data.aws_iam_role.lab_role.arn
   common_tags          = local.common_tags
 }
 
 # ==============================================================================
-# Module 7: Frontend S3 bucket
+# Module 8: Monitoring (CloudWatch + SNS)
+# ==============================================================================
+module "monitoring" {
+  source               = "./modules/monitoring"
+  project_name         = var.project_name
+  lambda_function_name = module.lambda.function_name
+  alert_email          = var.alert_email
+  common_tags          = local.common_tags
+}
+
+# ==============================================================================
+# Module 9: Frontend S3 bucket
 # ==============================================================================
 module "frontend" {
   source      = "./modules/frontend"

@@ -4,10 +4,9 @@ resource "aws_apigatewayv2_api" "this" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = ["http://gideon-sast-frontend.s3-website-us-east-1.amazonaws.com"]
+    allow_origins = ["*"]
     allow_methods = ["POST", "OPTIONS"]
-    # Only header names, NOT values like "application/json"
-    allow_headers = ["content-type", "authorization", "x-amz-date", "x-api-key"]
+    allow_headers = ["content-type"]
     max_age = 300
   }
 
@@ -21,7 +20,29 @@ resource "aws_apigatewayv2_stage" "this" {
   tags        = var.common_tags
 }
 
-resource "aws_apigatewayv2_integration" "this" {
+# Integration: API Gateway → SQS
+resource "aws_apigatewayv2_integration" "sqs" {
+  api_id              = aws_apigatewayv2_api.this.id
+  integration_type    = "AWS_PROXY"
+  integration_subtype = "SQS-SendMessage"
+
+  credentials_arn = var.iam_role_arn
+
+  request_parameters = {
+    "QueueUrl"    = var.sqs_queue_url
+    "MessageBody" = "$request.body"
+  }
+}
+
+# POST /scan → SQS
+resource "aws_apigatewayv2_route" "post_scan" {
+  api_id    = aws_apigatewayv2_api.this.id
+  route_key = "POST /scan"
+  target    = "integrations/${aws_apigatewayv2_integration.sqs.id}"
+}
+
+# GET /status → Lambda (polling)
+resource "aws_apigatewayv2_integration" "lambda_status" {
   api_id           = aws_apigatewayv2_api.this.id
   integration_type = "AWS_PROXY"
   integration_uri  = var.lambda_invoke_arn
@@ -29,13 +50,13 @@ resource "aws_apigatewayv2_integration" "this" {
   payload_format_version = "2.0"
 }
 
-# POST route only – API Gateway handles OPTIONS automatically via CORS config
-resource "aws_apigatewayv2_route" "post_scan" {
+resource "aws_apigatewayv2_route" "get_status" {
   api_id    = aws_apigatewayv2_api.this.id
-  route_key = "POST /scan"
-  target    = "integrations/${aws_apigatewayv2_integration.this.id}"
+  route_key = "GET /status"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda_status.id}"
 }
 
+# Lambda permission for status endpoint
 resource "aws_lambda_permission" "apigw" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"

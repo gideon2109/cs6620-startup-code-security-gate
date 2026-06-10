@@ -14,80 +14,79 @@ const DYNAMODB_TABLE_NAME = process.env.DYNAMODB_TABLE_NAME;
 const SNS_TOPIC_ARN = process.env.SNS_TOPIC_ARN;
 
 const standardHeaders = {
-  'Content-Type': 'application/json'
+  'Content-Type': 'application/json',
 };
 
 export const handler = async (event) => {
   console.log('Received event:', JSON.stringify(event, null, 2));
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // ── GET /status (Frontend Polling) ────────────────────────────────────────
-  // ──────────────────────────────────────────────────────────────────────────
-  if (event.httpMethod === 'GET' && event.rawPath === '/status') {
-    const scanId = event.queryStringParameters?.scanId;
-    
-    if (!scanId) {
-      return {
-        statusCode: 400,
-        headers: standardHeaders,
-        body: JSON.stringify({ error: 'Missing scanId parameter' })
-      };
-    }
-
-    const result = await ddbClient.send(new GetItemCommand({
-      TableName: DYNAMODB_TABLE_NAME,
-      Key: { scanId: { S: scanId } }
-    }));
-
-    if (!result.Item) {
-      return {
-        statusCode: 404,
-        headers: standardHeaders,
-        body: JSON.stringify({ error: 'Scan ID not found' })
-      };
-    }
-
-    return {
-      statusCode: 200,
-      headers: standardHeaders,
-      body: JSON.stringify({
-        status: result.Item.status?.S || 'COMPLETED',
-        highCount: parseInt(result.Item.highCount?.N || '0'),
-        mediumCount: parseInt(result.Item.mediumCount?.N || '0'),
-        lowCount: parseInt(result.Item.lowCount?.N || '0'),
-        totalCount: parseInt(result.Item.totalCount?.N || '0'),
-        s3Key: result.Item.s3Key?.S,
-        scannedAt: result.Item.scannedAt?.S,
-        filename: result.Item.filename?.S
-      })
-    };
-  }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // ── Email Full Report via SNS ─────────────────────────────────────────────
-  // ──────────────────────────────────────────────────────────────────────────
   try {
+    // ── Route: GET /status (Frontend Polling) ──────────────────────
+    const method = event.requestContext?.http?.method || event.httpMethod;
+    const path = event.requestContext?.http?.path || event.rawPath || event.path;
+
+    if (method === 'GET' && (path === '/status' || path?.endsWith('/status'))) {
+      const scanId = event.queryStringParameters?.scanId;
+      
+      if (!scanId) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({ error: 'Missing scanId parameter' })
+        };
+      }
+
+      const result = await ddbClient.send(new GetItemCommand({
+        TableName: DYNAMODB_TABLE_NAME,
+        Key: { scanId: { S: scanId } }
+      }));
+
+      if (!result.Item) {
+        return {
+          statusCode: 404,
+          body: JSON.stringify({ error: 'Scan job not found or still processing' })
+        };
+      }
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          status: result.Item.status?.S || 'COMPLETED',
+          scanId: scanId,
+          filename: result.Item.filename?.S || 'unknown.js',
+          scannedAt: result.Item.scannedAt?.S,
+          summary: {
+            high: parseInt(result.Item.highCount?.N || '0'),
+            medium: parseInt(result.Item.mediumCount?.N || '0'),
+            low: parseInt(result.Item.lowCount?.N || '0'),
+            totalVulnerabilities: parseInt(result.Item.totalCount?.N || '0')
+          },
+          s3Key: result.Item.s3Key?.S
+        })
+      };
+    }
+
+    // ── Unpack Incoming Request Body ──────────────────────────────
     let body = {};
-    if (event.body) {
+    if (event.Records && event.Records[0]?.body) {
+      body = JSON.parse(event.Records[0].body);
+    } else if (event.body) {
       body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
     } else {
       body = event;
     }
 
+    // ── Route: Email Full Report via SNS ──────────────────────────
     if (body.action === 'email_report') {
       return await handleEmailReport(body);
     }
 
-    // ────────────────────────────────────────────────────────────────────────
-    // ── Default Scan ────────────────────────────────────────────────────────
-    // ────────────────────────────────────────────────────────────────────────
+    // ── Route: Standard/Async Scan ────────────────────────────────
     const { code, filename = 'untitled.js' } = body;
 
     if (!code) {
       return {
         statusCode: 400,
-        headers: standardHeaders,
-        body: JSON.stringify({ error: 'No code provided' })
+        body: JSON.stringify({ error: 'No code provided for static analysis' })
       };
     }
 
@@ -111,6 +110,7 @@ export const handler = async (event) => {
       vulnerabilities: results
     };
 
+    // Store full report document in S3
     let s3Key = null;
     if (S3_BUCKET_NAME) {
       s3Key = `reports/${scanId}.json`;
@@ -122,8 +122,9 @@ export const handler = async (event) => {
       }));
     }
 
+    // Store tracking record in DynamoDB with status tracking
     if (DYNAMODB_TABLE_NAME) {
-      const ttl = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60);
+      const ttl = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // 30-Day TTL
       await docClient.send(new PutCommand({
         TableName: DYNAMODB_TABLE_NAME,
         Item: {
@@ -141,41 +142,30 @@ export const handler = async (event) => {
       }));
     }
 
-    // SNS alert for HIGH severity findings
-    if (SNS_TOPIC_ARN && summary.high > 0) {
-      const highFindings = results
-        .filter(v => v.severity === 'HIGH')
-        .map(v => `  • [Line ${v.line}] ${v.name}: ${v.message}`)
-        .join('\n');
+    // Alert team via SNS for High vulnerabilities
+   // if (SNS_TOPIC_ARN && summary.high > 0) {
+   //   const highFindings = results
+   //     .filter(v => v.severity === 'HIGH')
+     //   .map(v => `  • [Line ${v.line}] ${v.name}: ${v.message}`)
+    //    .join('\n');
 
-      await sns.send(new PublishCommand({
-        TopicArn: SNS_TOPIC_ARN,
-        Subject: `🚨 SAST Alert: ${summary.high} HIGH Severity Finding(s) in ${filename}`,
-        Message: [
-          `SAST Scanner – Critical Vulnerability Alert`,
-          `─────────────────────────────────────────`,
-          `Scan ID   : ${scanId}`,
-          `File      : ${filename}`,
-          `Timestamp : ${scannedAt}`,
-          ``,
-          `Summary`,
-          `  High   : ${summary.high}`,
-          `  Medium : ${summary.medium}`,
-          `  Low    : ${summary.low}`,
-          `  Total  : ${summary.totalVulnerabilities}`,
-          ``,
-          `HIGH Severity Findings`,
-          highFindings,
-          ``,
-          `Full report stored in S3: ${s3Key}`
-        ].join('\n')
-      }));
-      console.log(`SNS alert published for ${summary.high} HIGH finding(s) in ${filename}`);
-    }
+    //  await sns.send(new PublishCommand({
+     //   TopicArn: SNS_TOPIC_ARN,
+     //   Subject: `🚨 SAST Alert: ${summary.high} HIGH Findings in ${filename}`,
+     //   Message: [
+      //    `SAST Scanner – Critical Vulnerability Alert`,
+      //    `─────────────────────────────────────────`,
+      //    `Scan ID   : ${scanId}`,
+      //    `File      : ${filename}`,
+      //    ``,
+      //    `HIGH Severity Findings`,
+      //    highFindings
+      //  ].join('\n')
+     // }));
+    // }
 
     return {
       statusCode: 200,
-      headers: standardHeaders,
       body: JSON.stringify({
         success: true,
         scanId,
@@ -188,99 +178,103 @@ export const handler = async (event) => {
     };
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Handler execution failure:', error);
     return {
       statusCode: 500,
-      headers: standardHeaders,
       body: JSON.stringify({ error: 'Scan failed', message: error.message })
     };
   }
 };
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Handler: Email Full Vulnerability Report via SNS
-// ══════════════════════════════════════════════════════════════════════════════
 async function handleEmailReport(body) {
   const { scanId, filename, scannedAt, summary, vulnerabilities, s3Key } = body;
 
   if (!SNS_TOPIC_ARN) {
     return {
       statusCode: 500,
-      headers: standardHeaders,
-      body: JSON.stringify({ error: 'SNS topic not configured' })
+      body: JSON.stringify({ error: 'SNS topic component not set' })
     };
   }
 
-  if (!scanId || !summary) {
-    return {
-      statusCode: 400,
-      headers: standardHeaders,
-      body: JSON.stringify({ error: 'Missing scan data. Please run a scan first.' })
-    };
-  }
-
+  // 1. Group vulnerabilities cleanly
   const grouped = { HIGH: [], MEDIUM: [], LOW: [] };
   (vulnerabilities || []).forEach(v => {
     const sev = (v.severity || 'LOW').toUpperCase();
     if (grouped[sev]) grouped[sev].push(v);
   });
 
+  // 2. Compute visual proportions for the ASCII Bar Chart
+  const totalCounts = [summary.high || 0, summary.medium || 0, summary.low || 0];
+  const maxCount = Math.max(...totalCounts, 1);
+  const maxBarLength = 25; // Length of chart bars
+
+  const generateASCIIBar = (count) => {
+    const currentCount = count || 0;
+    const filledLength = Math.round((currentCount / maxCount) * maxBarLength);
+    const emptyLength = Math.max(0, maxBarLength - filledLength);
+    return '█'.repeat(filledLength) + '░'.repeat(emptyLength);
+  };
+
+  const highBar   = generateASCIIBar(summary.high);
+  const mediumBar = generateASCIIBar(summary.medium);
+  const lowBar    = generateASCIIBar(summary.low);
+
+  // 3. Format individual line reports inside categories
   const formatFindings = (findings) => {
-    if (findings.length === 0) return '  (none)\n';
+    if (!findings || findings.length === 0) return '   (No vulnerabilities identified in this tier)\n';
     return findings
-      .map((v, i) => [
-        `  ${i + 1}. ${v.name}`,
-        `     Line     : ${v.line}`,
-        `     Message  : ${v.message}`,
-        `     Evidence : ${v.evidence || 'N/A'}`
-      ].join('\n'))
+      .map((v, i) => `   [${i + 1}] Line ${v.line} | ${v.name}\n       Description: ${v.message}`)
       .join('\n\n');
   };
 
+  // 4. layout structure
   const emailBody = [
-    `╔══════════════════════════════════════════════════════════╗`,
-    `║   SAST SCANNER — FULL VULNERABILITY REPORT             ║`,
-    `╚══════════════════════════════════════════════════════════╝`,
+    `=============================================================`,
+    ` 🛡️  SECURE PIPELINE ANALYSIS REPORT — GROUP 9`,
+    `=============================================================`,
+    ` SUMMARY METRICS`,
+    ` ────────────────────────────────────────────────────────────`,
+    ` Target File   : ${filename.toUpperCase()}`,
+    ` Scan ID       : ${scanId}`,
+    ` Timestamp     : ${scannedAt}`,
+    ` S3 Report Key : ${s3Key || 'N/A'}`,
+    ` Total Flaws   : ${summary.totalVulnerabilities || summary.high + summary.medium + summary.low} Findings`,
     ``,
-    `Scan ID     : ${scanId}`,
-    `File        : ${filename || 'unknown'}`,
-    `Scanned At  : ${scannedAt || new Date().toISOString()}`,
-    `S3 Report   : ${s3Key || 'N/A'}`,
+    ` 📊 SEVERITY DISTRIBUTION CHART`,
+    ` ────────────────────────────────────────────────────────────`,
+    ` HIGH   [${String(summary.high || 0).padStart(2, ' ')}] | ${highBar}`,
+    ` MEDIUM [${String(summary.medium || 0).padStart(2, ' ')}] | ${mediumBar}`,
+    ` LOW    [${String(summary.low || 0).padStart(2, ' ')}] | ${lowBar}`,
     ``,
-    `────────────────── SUMMARY ──────────────────`,
-    `  Total Vulnerabilities : ${summary.totalVulnerabilities}`,
-    `  🔴 High               : ${summary.high}`,
-    `  🟡 Medium             : ${summary.medium}`,
-    `  🟢 Low                : ${summary.low}`,
+    `=============================================================`,
+    ` DETAILED FINDINGS LOG`,
+    `=============================================================`,
     ``,
-    `────────────────── HIGH SEVERITY ──────────────────`,
+    ` 🚨 HIGH SEVERITY RISK FOUND`,
+    ` ────────────────────────────────────────────────────────────`,
     formatFindings(grouped.HIGH),
     ``,
-    `────────────────── MEDIUM SEVERITY ──────────────────`,
+    ` ⚠️ MEDIUM SEVERITY RISK FOUND`,
+    ` ────────────────────────────────────────────────────────────`,
     formatFindings(grouped.MEDIUM),
     ``,
-    `────────────────── LOW SEVERITY ──────────────────`,
+    ` ℹ️ LOW SEVERITY RISK FOUND`,
+    ` ────────────────────────────────────────────────────────────`,
     formatFindings(grouped.LOW),
     ``,
-    `──────────────────────────────────────────────`,
-    `Report generated by Startup Code Security Gate`,
-    `Cloud Computing CS6620 — Group 9`
+    ` ────────────────────────────────────────────────────────────`,
+    ` End of Security Report | Startup Code Security Gate — Group 9`,
+    `=============================================================`
   ].join('\n');
 
-  const subjectTag = summary.high > 0 ? '🚨 CRITICAL' : summary.medium > 0 ? '⚠️ WARNING' : '✅ CLEAN';
-
+  // 5. Send out the clean layout block via SNS
   await sns.send(new PublishCommand({
     TopicArn: SNS_TOPIC_ARN,
-    Subject: `${subjectTag} SAST Report: ${summary.totalVulnerabilities} finding(s) in ${filename || 'scan'}`,
+    Subject: `🛡️ SAST Security Summary: ${summary.totalVulnerabilities || summary.high + summary.medium + summary.low} Issues Found in ${filename}`,
     Message: emailBody
   }));
 
   return {
     statusCode: 200,
-    headers: standardHeaders,
-    body: JSON.stringify({
-      success: true,
-      message: `Full vulnerability report sent via email (SNS) for scan ${scanId}`
-    })
+    body: JSON.stringify({ success: true, message: 'Structured report delivered via SNS' })
   };
 }

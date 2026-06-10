@@ -29,16 +29,16 @@ resource "aws_lambda_function" "this" {
 resource "aws_lambda_function_url" "this" {
   function_name      = aws_lambda_function.this.function_name
   authorization_type = "NONE"
-
+  
   cors {
-    allow_origins = ["*"]
-    allow_methods = ["POST"]
-    allow_headers = ["content-type", "application/json"]
+    allow_origins     = ["*"]
+    allow_methods     = ["POST"]
+    allow_headers     = ["content-type", "authorization"]
+    expose_headers    = ["date", "x-amzn-requestid"]
     allow_credentials = false
-    max_age = 86400
+    max_age           = 86400
   }
 
-  # This is fixed:Wait for Lambda function to be fully created
   depends_on = [aws_lambda_function.this]
 }
 
@@ -52,3 +52,26 @@ resource "aws_lambda_permission" "func_url" {
 
   depends_on = [aws_lambda_function_url.this]
 }
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SQS Trigger: Lambda reads messages from SQS queue
+# ──────────────────────────────────────────────────────────────────────────────
+resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+  event_source_arn = var.sqs_queue_arn
+  function_name    = aws_lambda_function.this.function_name
+  batch_size       = 1
+  enabled          = true
+
+  tags = var.common_tags
+}
+
+# Permission 2: Allow public invocation of the underlying function via the URL
+
+resource "aws_lambda_permission" "func_invoke_via_url" {
+  statement_id  = "AllowInvokeViaFunctionURL"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.this.function_name
+  principal     = "*"
+}
+
+# Lambda SQS trigger
