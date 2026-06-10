@@ -84,6 +84,11 @@ export const handler = async (event) => {
     const { code, filename = 'untitled.js' } = body;
 
     if (!code) {
+      const invalidPayloadError = new Error('Invalid SQS scan payload: missing code field');
+      if (event.Records) {
+        throw invalidPayloadError;
+      }
+
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'No code provided for static analysis' })
@@ -179,6 +184,11 @@ export const handler = async (event) => {
 
   } catch (error) {
     console.error('Handler execution failure:', error);
+
+    if (event.Records) {
+      throw error;
+    }
+
     return {
       statusCode: 500,
       body: JSON.stringify({ error: 'Scan failed', message: error.message })

@@ -110,13 +110,13 @@ npm run build
 
 # Deploy to S3
 echo "==> Deploying frontend to S3..."
-aws s3 sync build/ s3://gideon-sast-frontend/ --region us-east-1 --delete
+aws s3 sync build/ s3://group9-sast-frontend/ --region us-east-1 --delete
 
 echo ""
 echo "=========================================================="
 echo "       FRONTEND UPDATED SUCCESSFULLY                     "
 echo "=========================================================="
-echo "🌐 Frontend URL: http://gideon-sast-frontend.s3-website-us-east-1.amazonaws.com"
+echo "🌐 Frontend URL: http://group9-sast-frontend.s3-website-us-east-1.amazonaws.com"
 echo "=========================================================="
 
 # ==============================================================================

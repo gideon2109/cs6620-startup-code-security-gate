@@ -1,10 +1,3 @@
-# ==============================================================================
-# VPC – Milestone 2: Network Isolation for SAST Scanner Lambda
-# Architecture:
-#   Public Subnet  → Internet Gateway   (NAT Gateway lives here)
-#   Private Subnet → NAT Gateway        (Lambda lives here – no direct internet)
-# ==============================================================================
-
 resource "aws_vpc" "sast_vpc" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
