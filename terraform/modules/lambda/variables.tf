@@ -23,3 +23,18 @@ variable "common_tags" {
   description = "Common tags applied to all resources"
   default     = {}
 }
+
+variable "private_subnet_id" {
+  type        = string
+  description = "Private subnet ID where Lambda runs (inside VPC)"
+}
+
+variable "security_group_id" {
+  type        = string
+  description = "Security group ID attached to Lambda for outbound access"
+}
+
+variable "sns_topic_arn" {
+  type        = string
+  description = "SNS topic ARN for publishing critical vulnerability alerts"
+}

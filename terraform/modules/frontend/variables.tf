@@ -1,7 +1,7 @@
 variable "bucket_name" {
   type        = string
   description = "Name of the S3 bucket for frontend hosting"
-  default     = "gideon-sast-frontend"
+  default     = "group9-sast-frontend"
 }
 
 variable "common_tags" {

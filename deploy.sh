@@ -15,10 +15,10 @@ cd "$TERRAFORM_DIR"
 terraform init
 
 # ==============================================================================
-# Step 2: Deploy ECR Repository first (image must exist before Lambda)
+# Step 2: Deploy ECR + VPC first (image must exist before Lambda; VPC must exist too)
 # ==============================================================================
-echo "==> Step 2: Deploying ECR Repository..."
-terraform apply -target=module.ecr -auto-approve
+echo "==> Step 2: Deploying ECR Repository and VPC..."
+terraform apply -target=module.ecr -target=module.vpc -auto-approve
 
 # ==============================================================================
 # Step 3: Get ECR Repository URL from Terraform output
@@ -40,11 +40,18 @@ echo "==> Step 4: Authenticating Docker to AWS ECR..."
 aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_URL"
 
 # ==============================================================================
-# Step 5: Build the Docker image (from project root where Dockerfile lives)
+# Step 5: Build the Docker image
+# IMPORTANT: Use DOCKER_BUILDKIT=0 to avoid OCI Image Index format that
+# Lambda rejects. Lambda requires Docker V2 Schema 2 manifest.
 # ==============================================================================
-echo "==> Step 5: Building Docker image..."
+echo "==> Step 5: Building Docker image (Docker V2 format for Lambda)..."
 cd "$DIR"
-docker build --provenance=false --platform linux/amd64 -t "$ECR_URL:latest" .
+
+# Force legacy Docker build (no Buildx) to guarantee Docker V2 Schema 2 manifest
+DOCKER_BUILDKIT=0 docker build --platform linux/amd64 -t sast-scanner-local .
+
+# Tag for ECR
+docker tag sast-scanner-local:latest "$ECR_URL:latest"
 
 # ==============================================================================
 # Step 6: Push the Docker image to ECR
@@ -52,8 +59,18 @@ docker build --provenance=false --platform linux/amd64 -t "$ECR_URL:latest" .
 echo "==> Step 6: Pushing Docker image to ECR..."
 docker push "$ECR_URL:latest"
 
+# Verify the pushed manifest format
+echo "==> Verifying image manifest format..."
+aws ecr batch-get-image \
+    --repository-name startup-code-security-gate-repo \
+    --image-ids imageTag=latest \
+    --region "$AWS_REGION" \
+    --query 'images[0].imageManifest' \
+    --output text | head -c 200
+echo ""
+
 # ==============================================================================
-# Step 7: Deploy all remaining resources (S3, DynamoDB, Lambda, Monitoring)
+# Step 7: Deploy all remaining resources (S3, DynamoDB, Lambda, Monitoring, API GW)
 # ==============================================================================
 echo "==> Step 7: Deploying complete serverless stack..."
 cd "$TERRAFORM_DIR"

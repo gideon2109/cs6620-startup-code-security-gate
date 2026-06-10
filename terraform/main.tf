@@ -25,6 +25,16 @@ locals {
 }
 
 # ==============================================================================
+# Module 0: VPC – Network Isolation (Milestone 2)
+# Private subnet for Lambda + NAT Gateway for secure outbound access
+# ==============================================================================
+module "vpc" {
+  source      = "./modules/vpc"
+  aws_region  = var.aws_region
+  common_tags = local.common_tags
+}
+
+# ==============================================================================
 # Module 1: ECR
 # ==============================================================================
 module "ecr" {
@@ -51,7 +61,20 @@ module "dynamodb" {
 }
 
 # ==============================================================================
+# Module 6: Monitoring (CloudWatch + SNS)
+# Declared before Lambda so we can pass sns_topic_arn into Lambda env vars
+# ==============================================================================
+module "monitoring" {
+  source               = "./modules/monitoring"
+  project_name         = var.project_name
+  lambda_function_name = "sast-scanner-lambda"
+  alert_email          = var.alert_email
+  common_tags          = local.common_tags
+}
+
+# ==============================================================================
 # Module 4: Lambda
+# Runs inside private VPC subnet; SNS ARN injected for vulnerability alerts
 # ==============================================================================
 module "lambda" {
   source              = "./modules/lambda"
@@ -59,9 +82,12 @@ module "lambda" {
   ecr_repository_url  = module.ecr.repository_url
   s3_bucket_name      = module.s3.bucket_name
   dynamodb_table_name = module.dynamodb.table_name
+  private_subnet_id   = module.vpc.private_subnet_id
+  security_group_id   = module.vpc.security_group_id
+  sns_topic_arn       = module.monitoring.sns_topic_arn
   common_tags         = local.common_tags
 
-  depends_on = [module.ecr]
+  depends_on = [module.ecr, module.vpc]
 }
 
 # ==============================================================================
@@ -75,21 +101,10 @@ module "api_gateway" {
 }
 
 # ==============================================================================
-# Module 6: Monitoring (CloudWatch + SNS)
-# ==============================================================================
-module "monitoring" {
-  source               = "./modules/monitoring"
-  project_name         = var.project_name
-  lambda_function_name = module.lambda.function_name
-  alert_email          = var.alert_email
-  common_tags          = local.common_tags
-}
-
-# ==============================================================================
 # Module 7: Frontend S3 bucket
 # ==============================================================================
 module "frontend" {
   source      = "./modules/frontend"
-  bucket_name = "gideon-sast-frontend"
+  bucket_name = "group9-sast-frontend"
   common_tags = local.common_tags
 }

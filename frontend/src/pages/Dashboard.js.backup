@@ -93,7 +93,7 @@ const server_ip = "192.168.1.254";
       const response = await fetch(LAMBDA_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code, filename: filename, scannedBy: user?.email || 'anonymous' })
+        body: JSON.stringify({ code: code, filename: filename })
       });
 
       if (!response.ok) {
@@ -207,7 +207,7 @@ const server_ip = "192.168.1.254";
             <ShieldAlert size={20} color="#f8fafc" />
           </div>
           <div>
-            <h1 style={styles.navTitle}>Group 9 - Startup Code Security Gate</h1>
+            <h1 style={styles.navTitle}>Startup Code Security Gate</h1>
             <p style={styles.navSubtitle}>Cloud Pipeline Dashboard — Group 9</p>
           </div>
         </div>
