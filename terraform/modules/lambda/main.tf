@@ -7,7 +7,7 @@ resource "aws_lambda_function" "this" {
   timeout       = 30
   memory_size   = 512
 
-  # Milestone 2: Place Lambda inside the private VPC subnet
+  # Place Lambda inside the private VPC subnet
   # Outbound traffic routes via NAT Gateway → Internet Gateway
   vpc_config {
     subnet_ids         = [var.private_subnet_id]
